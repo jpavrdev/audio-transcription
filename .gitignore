@@ -1,0 +1,9 @@
+# build do cmake
+/build/
+
+# modelos baixados (grandes, reproduziveis com scripts/baixar-modelo.sh)
+/models/*.bin
+
+# arquivos temporarios e saidas de teste
+*.pcm
+/teste_*
