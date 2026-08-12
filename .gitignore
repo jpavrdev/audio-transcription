@@ -10,3 +10,7 @@
 
 # transcricoes geradas (grandes)
 /saidas/
+
+# servidor web
+/servidor/build/
+/servidor/.env
