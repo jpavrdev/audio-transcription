@@ -17,6 +17,7 @@
 
 #include "bd.h"
 #include "senha.h"
+#include "auth.h"
 
 namespace fs = std::filesystem;
 
@@ -110,6 +111,9 @@ static int servir() {
         env("DB_USER", "painel"),
         env("DB_PASSWORD", "painel_dev"),
         1);
+
+    app.enableSession(3600);  // sessao de 1 hora por cookie
+    registrar_auth();
 
     app.registerHandler("/",
         [](const drogon::HttpRequestPtr&,
