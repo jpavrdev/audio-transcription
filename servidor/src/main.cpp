@@ -18,6 +18,7 @@
 #include "bd.h"
 #include "senha.h"
 #include "auth.h"
+#include "leiloes.h"
 
 namespace fs = std::filesystem;
 
@@ -120,8 +121,10 @@ static int servir() {
         env("DB_PASSWORD", "painel_dev"),
         1);
 
+    app.setThreadNum(4);      // threads pra nao travar tudo no acesso sincrono ao banco
     app.enableSession(3600);  // sessao de 1 hora por cookie
     registrar_auth();
+    registrar_leiloes();
 
     app.registerHandler("/",
         [](const drogon::HttpRequestPtr&,
@@ -147,18 +150,6 @@ static int servir() {
                     cb(resp);
                 });
         });
-
-    // rotas de exemplo protegidas por nivel (validam o rbac; viram reais no marco 5)
-    auto area = [](const std::string& nome) {
-        return [nome](const drogon::HttpRequestPtr&,
-                      std::function<void(const drogon::HttpResponsePtr&)>&& cb) {
-            Json::Value j; j["ok"] = true; j["area"] = nome;
-            cb(drogon::HttpResponse::newHttpJsonResponse(j));
-        };
-    };
-    app.registerHandler("/area/funcionario", area("funcionario"), {drogon::Get, "RequerFuncionario"});
-    app.registerHandler("/area/gerente",     area("gerente"),     {drogon::Get, "RequerGerente"});
-    app.registerHandler("/area/admin",       area("admin"),       {drogon::Get, "RequerAdmin"});
 
     LOG_INFO << "servidor em http://127.0.0.1:8080";
     app.addListener("0.0.0.0", 8080).run();
