@@ -22,5 +22,11 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(drogon)
 
-add_executable(servidor src/main.cpp)
-target_link_libraries(servidor PRIVATE drogon)
+add_executable(servidor
+    src/main.cpp
+    src/bd.cpp
+    src/senha.cpp
+)
+
+# drogon pro servidor web, pqxx/pq pro acesso sincrono, argon2 pro hash de senha
+target_link_libraries(servidor PRIVATE drogon pqxx pq argon2)
