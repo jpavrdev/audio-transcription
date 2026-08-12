@@ -78,8 +78,12 @@ static int migrar() {
     }
 }
 
-static int criar_admin(const std::string& usuario) {
+static int criar_usuario(const std::string& usuario, const std::string& papel) {
     if (usuario.empty()) { std::cerr << "informe o nome de usuario\n"; return 1; }
+    if (papel != "admin" && papel != "gerente" && papel != "funcionario") {
+        std::cerr << "papel invalido (use admin, gerente ou funcionario)\n";
+        return 1;
+    }
     std::string s;
     std::getline(std::cin, s);
     if (s.size() < 8) { std::cerr << "senha muito curta (minimo 8 caracteres)\n"; return 1; }
@@ -88,17 +92,21 @@ static int criar_admin(const std::string& usuario) {
         pqxx::connection c(bd::conn_string());
         pqxx::work w(c);
         w.exec_params(
-            "insert into usuarios(nome_usuario, senha_hash, papel) values($1,$2,'admin') "
+            "insert into usuarios(nome_usuario, senha_hash, papel) values($1,$2,$3) "
             "on conflict (nome_usuario) do update set senha_hash=excluded.senha_hash, "
-            "papel='admin', ativo=true, atualizado_em=now()",
-            usuario, h);
+            "papel=excluded.papel, ativo=true, atualizado_em=now()",
+            usuario, h, papel);
         w.commit();
-        std::cout << "admin '" << usuario << "' criado ou atualizado\n";
+        std::cout << "usuario '" << usuario << "' (" << papel << ") criado ou atualizado\n";
         return 0;
     } catch (const std::exception& e) {
-        std::cerr << "erro ao criar admin: " << e.what() << "\n";
+        std::cerr << "erro ao criar usuario: " << e.what() << "\n";
         return 1;
     }
+}
+
+static int criar_admin(const std::string& usuario) {
+    return criar_usuario(usuario, "admin");
 }
 
 static int servir() {
@@ -140,6 +148,18 @@ static int servir() {
                 });
         });
 
+    // rotas de exemplo protegidas por nivel (validam o rbac; viram reais no marco 5)
+    auto area = [](const std::string& nome) {
+        return [nome](const drogon::HttpRequestPtr&,
+                      std::function<void(const drogon::HttpResponsePtr&)>&& cb) {
+            Json::Value j; j["ok"] = true; j["area"] = nome;
+            cb(drogon::HttpResponse::newHttpJsonResponse(j));
+        };
+    };
+    app.registerHandler("/area/funcionario", area("funcionario"), {drogon::Get, "RequerFuncionario"});
+    app.registerHandler("/area/gerente",     area("gerente"),     {drogon::Get, "RequerGerente"});
+    app.registerHandler("/area/admin",       area("admin"),       {drogon::Get, "RequerAdmin"});
+
     LOG_INFO << "servidor em http://127.0.0.1:8080";
     app.addListener("0.0.0.0", 8080).run();
     return 0;
@@ -147,9 +167,11 @@ static int servir() {
 
 int main(int argc, char** argv) {
     std::string cmd = argc > 1 ? argv[1] : "servir";
-    if (cmd == "servir")      return servir();
-    if (cmd == "migrar")      return migrar();
-    if (cmd == "criar-admin") return criar_admin(argc > 2 ? argv[2] : "");
-    std::cerr << "uso: " << argv[0] << " [servir|migrar|criar-admin <usuario>]\n";
+    if (cmd == "servir")        return servir();
+    if (cmd == "migrar")        return migrar();
+    if (cmd == "criar-admin")   return criar_admin(argc > 2 ? argv[2] : "");
+    if (cmd == "criar-usuario") return criar_usuario(argc > 2 ? argv[2] : "", argc > 3 ? argv[3] : "");
+    std::cerr << "uso: " << argv[0]
+              << " [servir|migrar|criar-admin <usuario>|criar-usuario <usuario> <papel>]\n";
     return 1;
 }
