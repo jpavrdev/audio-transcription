@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel de Leilões</title>
+<style>
+:root{
+  --azul:#005493; --azul-esc:#00427a; --ciano:#00A0CE;
+  --bg:#eef2f6; --card:#fff; --texto:#1c2b3a; --suave:#6b7a8d; --borda:#e2e8f0;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--texto)}
+img{display:block}
+
+/* login */
+#login{min-height:100vh;display:grid;place-items:center;padding:1rem;
+  background:linear-gradient(135deg,var(--azul) 0%,var(--ciano) 100%)}
+.login-card{background:#fff;border-radius:16px;padding:2rem 1.8rem;width:min(380px,100%);
+  box-shadow:0 12px 45px rgba(0,0,0,.25);text-align:center}
+.login-card img{height:44px;margin:0 auto 1rem}
+.login-card h1{font-size:1.05rem;color:var(--azul);margin:.2rem 0 1.3rem;font-weight:600}
+.campo{text-align:left;margin-bottom:.8rem}
+.campo label{display:block;font-size:.78rem;color:var(--suave);margin-bottom:.3rem}
+.campo input{width:100%;padding:.6rem .7rem;border:1px solid var(--borda);border-radius:8px;font-size:1rem}
+.campo input:focus{outline:none;border-color:var(--ciano);box-shadow:0 0 0 3px rgba(0,160,206,.16)}
+.btn{background:var(--azul);color:#fff;border:none;padding:.68rem 1rem;border-radius:8px;
+  font-size:1rem;cursor:pointer;width:100%;font-weight:600}
+.btn:hover{background:var(--azul-esc)}
+.erro{color:#c0392b;font-size:.85rem;min-height:1.1rem;margin-top:.6rem}
+
+/* app */
+#app{display:none}
+.topo{background:#fff;border-bottom:3px solid var(--ciano);display:flex;align-items:center;
+  justify-content:space-between;padding:.55rem 1.2rem;position:sticky;top:0;z-index:10}
+.topo img{height:32px}
+.topo .dir{display:flex;align-items:center;gap:.9rem;font-size:.85rem;color:var(--suave)}
+.sair{background:none;border:1px solid var(--borda);border-radius:6px;padding:.35rem .7rem;
+  cursor:pointer;color:var(--azul);font-size:.8rem}
+.sair:hover{border-color:var(--ciano)}
+.conteudo{max-width:1120px;margin:0 auto;padding:1.4rem 1.2rem}
+.conteudo.largo{max-width:none;padding-left:.9rem;padding-right:.9rem}
+h2{color:var(--azul);font-size:1.3rem;margin:.2rem 0 1rem}
+
+/* lista */
+.card-leilao{background:var(--card);border:1px solid var(--borda);border-radius:12px;
+  padding:.9rem 1.1rem;margin-bottom:.7rem;cursor:pointer;display:flex;
+  justify-content:space-between;align-items:center;transition:.15s}
+.card-leilao:hover{border-color:var(--ciano);box-shadow:0 5px 16px rgba(0,84,147,.09)}
+.card-leilao .t{font-weight:600}
+.card-leilao .m{font-size:.8rem;color:var(--suave);margin-top:.15rem}
+.chip{background:var(--azul);color:#fff;border-radius:20px;padding:.25rem .8rem;font-size:.8rem;white-space:nowrap}
+.chip.processando{background:var(--ciano);animation:pulsa 1.2s infinite}
+.chip.erro{background:#c0392b}
+@keyframes pulsa{0%,100%{opacity:1}50%{opacity:.45}}
+.novo-btn{background:var(--azul);color:#fff;border:none;border-radius:8px;padding:.45rem .9rem;font-size:.85rem;cursor:pointer;font-weight:600;float:right}
+.novo-btn:hover{background:var(--azul-esc)}
+.novo-form{background:#fff;border:1px solid var(--borda);border-radius:12px;padding:1rem;margin-bottom:1rem;display:none}
+.novo-form input{width:100%;padding:.55rem .7rem;border:1px solid var(--borda);border-radius:8px;margin-bottom:.6rem;font-size:1rem}
+.novo-form input:focus{outline:none;border-color:var(--ciano)}
+.novo-form .linha{display:flex;gap:.8rem;align-items:center}
+
+/* detalhe */
+.voltar{background:none;border:none;color:var(--azul);cursor:pointer;font-size:.9rem;padding:0;margin-bottom:.4rem}
+.cards{display:flex;flex-wrap:wrap;gap:.6rem;margin:.4rem 0 1rem}
+.mini{background:#fff;border:1px solid var(--borda);border-radius:10px;padding:.5rem .9rem;min-width:110px}
+.mini b{font-size:1.3rem;display:block;color:var(--azul)}
+.mini span{font-size:.75rem;color:var(--suave)}
+.filtro{padding:.55rem .7rem;border:1px solid var(--borda);border-radius:8px;width:min(360px,100%);
+  font-size:1rem;margin-bottom:.7rem}
+.wrap{overflow-x:auto;background:#fff;border:1px solid var(--borda);border-radius:12px}
+table{border-collapse:collapse;width:100%;font-size:.84rem}
+th,td{padding:.5rem .6rem;text-align:left;border-bottom:1px solid var(--borda);white-space:nowrap;vertical-align:top}
+th{background:var(--azul);color:#fff;position:sticky;top:0;cursor:pointer;user-select:none}
+th:hover{background:var(--azul-esc)}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+td.trecho{white-space:normal;max-width:280px;color:var(--suave)}
+tr:hover td{background:#f0fafd}
+a{color:var(--ciano);text-decoration:none}
+a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <form class="login-card" id="form-login">
+    <img src="/logo.png" alt="Mamede Assessoria">
+    <h1>Painel de Leilões</h1>
+    <div class="campo"><label>Usuário</label><input id="usuario" autocomplete="username" autofocus></div>
+    <div class="campo"><label>Senha</label><input id="senha" type="password" autocomplete="current-password"></div>
+    <button class="btn" type="submit">Entrar</button>
+    <div class="erro" id="erro-login"></div>
+  </form>
+</div>
+
+<div id="app">
+  <div class="topo">
+    <img src="/logo.png" alt="Mamede Assessoria">
+    <div class="dir"><span id="quem"></span><button class="sair" onclick="sair()">Sair</button></div>
+  </div>
+  <div class="conteudo" id="conteudo"></div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const seg = t => { const m = /(\d+):(\d{2}):(\d{2})/.exec(t||''); return m ? (+m[1]*3600 + +m[2]*60 + +m[3]) : null; };
+let nivelUsuario = 0, timerLista = null;
+
+async function api(metodo, url, corpo){
+  const opt = { method: metodo, headers: {} };
+  if (corpo){ opt.headers['Content-Type']='application/json'; opt.body = JSON.stringify(corpo); }
+  const r = await fetch(url, opt);
+  let j = null; try { j = await r.json(); } catch(e){}
+  return { status: r.status, j };
+}
+function mostra(qual){ $('#login').style.display = qual==='login'?'grid':'none'; $('#app').style.display = qual==='app'?'block':'none'; }
+
+async function iniciar(){
+  const { status, j } = await api('GET','/eu');
+  if (status===200 && j && j.ok){ nivelUsuario = j.nivel || 0; $('#quem').textContent = j.usuario + ' · ' + j.papel; mostra('app'); listar(); }
+  else mostra('login');
+}
+
+$('#form-login').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('#erro-login').textContent = '';
+  const { status, j } = await api('POST','/login', { usuario: $('#usuario').value, senha: $('#senha').value });
+  if (status===200 && j && j.ok) iniciar();
+  else $('#erro-login').textContent = (j && j.erro) ? j.erro : 'falha no login';
+});
+
+async function sair(){ await api('POST','/logout'); $('#senha').value=''; mostra('login'); }
+
+async function listar(){
+  if (timerLista){ clearTimeout(timerLista); timerLista = null; }
+  $('#conteudo').classList.remove('largo');
+  const { j } = await api('GET','/leiloes');
+  const leiloes = (j && j.leiloes) || [];
+  const podeCriar = nivelUsuario >= 2;
+  let html = '<h2>Leilões';
+  if (podeCriar) html += '<button class="novo-btn" onclick="toggleNovo()">+ Novo leilão</button>';
+  html += '</h2>';
+  if (podeCriar){
+    html += `<div class="novo-form" id="novoForm">
+      <input id="novoTitulo" placeholder="Título do leilão">
+      <input id="novoLink" placeholder="Link do vídeo (YouTube)">
+      <div class="linha"><button class="btn" style="width:auto" onclick="novoLeilao()">Puxar leilão</button>
+      <span class="m" id="novoMsg" style="color:var(--suave)"></span></div></div>`;
+  }
+  if (!leiloes.length) html += '<p style="color:var(--suave)">Nenhum leilão ainda.</p>';
+  let processando = false;
+  for (const l of leiloes){
+    let chip;
+    if (l.status === 'processando'){ chip = '<span class="chip processando">processando...</span>'; processando = true; }
+    else if (l.status === 'erro'){ chip = `<span class="chip erro" title="${esc(l.erro)}">erro</span>`; }
+    else chip = `<span class="chip">${l.total_lotes} lotes</span>`;
+    const clicavel = l.status === 'pronto' ? `onclick="abrir(${l.id})"` : 'style="cursor:default;opacity:.85"';
+    html += `<div class="card-leilao" ${clicavel}>
+      <div><div class="t">${esc(l.titulo)}</div>
+      <div class="m">${esc(l.criado_em)}${l.fonte ? ' · ' + esc(l.fonte) : ''}</div></div>
+      ${chip}</div>`;
+  }
+  $('#conteudo').innerHTML = html;
+  if (processando) timerLista = setTimeout(listar, 8000);
+}
+function toggleNovo(){ const f = $('#novoForm'); f.style.display = f.style.display === 'block' ? 'none' : 'block'; }
+async function novoLeilao(){
+  const titulo = $('#novoTitulo').value.trim(), link = $('#novoLink').value.trim();
+  if (!titulo || !link){ $('#novoMsg').textContent = 'preencha título e link'; return; }
+  $('#novoMsg').textContent = 'enviando...';
+  const { status, j } = await api('POST','/leiloes/novo',{ titulo, link });
+  if (status===200 && j && j.ok) listar();
+  else $('#novoMsg').textContent = (j && j.erro) ? j.erro : 'falha';
+}
+
+async function abrir(id){
+  if (timerLista){ clearTimeout(timerLista); timerLista = null; }
+  $('#conteudo').classList.add('largo');
+  const { j } = await api('GET','/leiloes/'+id);
+  if (!j || !j.ok) return;
+  const L = j.leilao, lotes = j.lotes || [], vid = (L.fonte||'').trim();
+  const comComprador = lotes.filter(x => x.comprador).length;
+  const comValor = lotes.filter(x => x.valor_num != null).length;
+
+  const cols = [
+    ['lote','Lote','n'], ['valor_num','Valor','n'], ['comprador','Comprador','t'],
+    ['fazenda','Fazenda','t'], ['local','Cidade/UF','t'], ['com_quem','Com quem','t'],
+    ['vendedor','Vendedor','t'], ['timestamp','Horário','n'], ['trecho','Trecho','t']
+  ];
+  let th = cols.map(c => `<th data-t="${c[2]}">${c[1]}</th>`).join('');
+  let trs = '';
+  for (const x of lotes){
+    const local = [x.cidade, x.estado].filter(Boolean).join('/');
+    const s = seg(x.timestamp);
+    const hora = (vid && s!=null)
+      ? `<a href="https://www.youtube.com/watch?v=${encodeURIComponent(vid)}&t=${s}" target="_blank" rel="noopener">${esc(x.timestamp)}</a>`
+      : esc(x.timestamp||'');
+    const valor = x.valor_num != null ? x.valor_num : '';
+    trs += `<tr>
+      <td class="num" data-v="${x.lote}">${x.lote}</td>
+      <td class="num" data-v="${x.valor_num!=null?x.valor_num:0}">${valor}</td>
+      <td>${esc(x.comprador)}</td><td>${esc(x.fazenda)}</td><td>${esc(local)}</td>
+      <td>${esc(x.com_quem)}</td><td>${esc(x.vendedor)}</td>
+      <td data-v="${s!=null?s:0}">${hora}</td><td class="trecho">${esc(x.trecho)}</td></tr>`;
+  }
+  $('#conteudo').innerHTML = `
+    <button class="voltar" onclick="listar()">&#8592; voltar aos leilões</button>
+    <h2>${esc(L.titulo)}</h2>
+    <div class="cards">
+      <div class="mini"><b>${lotes.length}</b><span>lotes</span></div>
+      <div class="mini"><b>${comComprador}</b><span>com comprador</span></div>
+      <div class="mini"><b>${comValor}</b><span>com valor</span></div>
+    </div>
+    <input class="filtro" id="filtro" placeholder="filtrar por lote, comprador, cidade, assessor...">
+    <div class="wrap"><table id="tab"><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table></div>`;
+
+  const tab = $('#tab');
+  $('#filtro').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    for (const tr of tab.tBodies[0].rows) tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+  tab.querySelectorAll('th').forEach((th, i) => {
+    let asc = true;
+    th.addEventListener('click', () => {
+      const num = th.dataset.t === 'n';
+      const linhas = [...tab.tBodies[0].rows];
+      linhas.sort((a,b) => {
+        const x = num ? +(a.cells[i].dataset.v||0) : a.cells[i].textContent.toLowerCase();
+        const y = num ? +(b.cells[i].dataset.v||0) : b.cells[i].textContent.toLowerCase();
+        return (x<y?-1:x>y?1:0) * (asc?1:-1);
+      });
+      asc = !asc;
+      linhas.forEach(r => tab.tBodies[0].appendChild(r));
+    });
+  });
+}
+
+iniciar();
+</script>
+</body>
+</html>
