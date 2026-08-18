@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel de Leilões</title>
+<style>
+:root{
+  --azul:#005493; --azul-esc:#00427a; --ciano:#00A0CE;
+  --bg:#eef2f6; --card:#fff; --texto:#1c2b3a; --suave:#6b7a8d; --borda:#e2e8f0;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--texto)}
+img{display:block}
+
+/* login */
+#login{min-height:100vh;display:grid;place-items:center;padding:1rem;
+  background:linear-gradient(135deg,var(--azul) 0%,var(--ciano) 100%)}
+.login-card{background:#fff;border-radius:16px;padding:2rem 1.8rem;width:min(380px,100%);
+  box-shadow:0 12px 45px rgba(0,0,0,.25);text-align:center}
+.login-card img{height:44px;margin:0 auto 1rem}
+.login-card h1{font-size:1.05rem;color:var(--azul);margin:.2rem 0 1.3rem;font-weight:600}
+.campo{text-align:left;margin-bottom:.8rem}
+.campo label{display:block;font-size:.78rem;color:var(--suave);margin-bottom:.3rem}
+.campo input{width:100%;padding:.6rem .7rem;border:1px solid var(--borda);border-radius:8px;font-size:1rem}
+.campo input:focus{outline:none;border-color:var(--ciano);box-shadow:0 0 0 3px rgba(0,160,206,.16)}
+.btn{background:var(--azul);color:#fff;border:none;padding:.68rem 1rem;border-radius:8px;
+  font-size:1rem;cursor:pointer;width:100%;font-weight:600}
+.btn:hover{background:var(--azul-esc)}
+.erro{color:#c0392b;font-size:.85rem;min-height:1.1rem;margin-top:.6rem}
+
+/* app */
+#app{display:none}
+.topo{background:#fff;border-bottom:3px solid var(--ciano);display:flex;align-items:center;
+  justify-content:space-between;padding:.55rem 1.2rem;position:sticky;top:0;z-index:10}
+.topo img{height:32px}
+.topo .esq{display:flex;align-items:center;gap:1.3rem}
+.topo .dir{display:flex;align-items:center;gap:.9rem;font-size:.85rem;color:var(--suave)}
+.abas{display:flex;gap:.4rem}
+.aba{background:none;border:none;font-size:.9rem;color:var(--suave);cursor:pointer;
+  padding:.5rem .3rem;border-bottom:2px solid transparent;font-weight:600}
+.aba:hover{color:var(--azul)}
+.aba.ativa{color:var(--azul);border-bottom-color:var(--ciano)}
+.sair{background:none;border:1px solid var(--borda);border-radius:6px;padding:.35rem .7rem;
+  cursor:pointer;color:var(--azul);font-size:.8rem}
+.sair:hover{border-color:var(--ciano)}
+.conteudo{max-width:1120px;margin:0 auto;padding:1.4rem 1.2rem}
+.conteudo.largo{max-width:none;padding-left:.9rem;padding-right:.9rem}
+h2{color:var(--azul);font-size:1.3rem;margin:.2rem 0 1rem}
+
+/* lista */
+.card-leilao{background:var(--card);border:1px solid var(--borda);border-radius:12px;
+  padding:.9rem 1.1rem;margin-bottom:.7rem;cursor:pointer;display:flex;
+  justify-content:space-between;align-items:center;transition:.15s}
+.card-leilao:hover{border-color:var(--ciano);box-shadow:0 5px 16px rgba(0,84,147,.09)}
+.card-leilao .t{font-weight:600}
+.card-leilao .m{font-size:.8rem;color:var(--suave);margin-top:.15rem}
+.chip{background:var(--azul);color:#fff;border-radius:20px;padding:.25rem .8rem;font-size:.8rem;white-space:nowrap}
+.chip.processando{background:var(--ciano);animation:pulsa 1.2s infinite}
+.chip.erro{background:#c0392b}
+@keyframes pulsa{0%,100%{opacity:1}50%{opacity:.45}}
+.novo-btn{background:var(--azul);color:#fff;border:none;border-radius:8px;padding:.45rem .9rem;font-size:.85rem;cursor:pointer;font-weight:600;float:right}
+.novo-btn:hover{background:var(--azul-esc)}
+.novo-form{background:#fff;border:1px solid var(--borda);border-radius:12px;padding:1rem;margin-bottom:1rem;display:none}
+.novo-form input{width:100%;padding:.55rem .7rem;border:1px solid var(--borda);border-radius:8px;margin-bottom:.6rem;font-size:1rem}
+.novo-form input:focus{outline:none;border-color:var(--ciano)}
+.novo-form .linha{display:flex;gap:.8rem;align-items:center}
+
+/* pagina de usuarios */
+.form-user{background:#fff;border:1px solid var(--borda);border-radius:12px;padding:1rem;margin-bottom:1.1rem}
+.form-user .linha{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center}
+.form-user input,.form-user select{padding:.55rem .7rem;border:1px solid var(--borda);
+  border-radius:8px;font-size:.95rem;background:#fff;color:var(--texto)}
+.form-user input{flex:1;min-width:170px}
+.form-user input:focus,.form-user select:focus{outline:none;border-color:var(--ciano)}
+.st{font-size:.75rem;border-radius:20px;padding:.2rem .65rem;font-weight:600}
+.st.ativo{background:#e4f6ec;color:#1c7a3f}
+.st.inativo{background:#f6e5e5;color:#c0392b}
+.mini-btn{border:1px solid var(--borda);background:#fff;border-radius:6px;padding:.32rem .8rem;
+  font-size:.8rem;cursor:pointer;font-weight:600}
+.mini-btn.desativar{color:#c0392b}
+.mini-btn.desativar:hover{border-color:#c0392b;background:#fdf1f1}
+.mini-btn.ativar{color:#1c7a3f}
+.mini-btn.ativar:hover{border-color:#1c7a3f;background:#eef8f1}
+td.cap{text-transform:capitalize}
+.eu-tag{font-size:.8rem;color:var(--suave)}
+
+/* detalhe */
+.voltar{background:none;border:none;color:var(--azul);cursor:pointer;font-size:.9rem;padding:0;margin-bottom:.4rem}
+.cards{display:flex;flex-wrap:wrap;gap:.6rem;margin:.4rem 0 1rem}
+.mini{background:#fff;border:1px solid var(--borda);border-radius:10px;padding:.5rem .9rem;min-width:110px}
+.mini b{font-size:1.3rem;display:block;color:var(--azul)}
+.mini span{font-size:.75rem;color:var(--suave)}
+.filtro{padding:.55rem .7rem;border:1px solid var(--borda);border-radius:8px;width:min(360px,100%);
+  font-size:1rem;margin-bottom:.7rem}
+.wrap{overflow-x:auto;background:#fff;border:1px solid var(--borda);border-radius:12px}
+table{border-collapse:collapse;width:100%;font-size:.84rem}
+th,td{padding:.5rem .6rem;text-align:left;border-bottom:1px solid var(--borda);white-space:nowrap;vertical-align:top}
+th{background:var(--azul);color:#fff;position:sticky;top:0;cursor:pointer;user-select:none}
+th:hover{background:var(--azul-esc)}
+.wrap.usuarios th{cursor:default}
+.wrap.usuarios th:hover{background:var(--azul)}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+td.trecho{white-space:normal;max-width:280px;color:var(--suave)}
+tr:hover td{background:#f0fafd}
+a{color:var(--ciano);text-decoration:none}
+a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <form class="login-card" id="form-login">
+    <img src="/logo.png" alt="Mamede Assessoria">
+    <h1>Painel de Leilões</h1>
+    <div class="campo"><label>Usuário</label><input id="usuario" autocomplete="username" autofocus></div>
+    <div class="campo"><label>Senha</label><input id="senha" type="password" autocomplete="current-password"></div>
+    <button class="btn" type="submit">Entrar</button>
+    <div class="erro" id="erro-login"></div>
+  </form>
+</div>
+
+<div id="app">
+  <div class="topo">
+    <div class="esq">
+      <img src="/logo.png" alt="Mamede Assessoria">
+      <nav class="abas">
+        <button class="aba ativa" id="abaLeiloes" onclick="irLeiloes()">Leilões</button>
+        <button class="aba" id="abaUsuarios" onclick="irUsuarios()" style="display:none">Usuários</button>
+      </nav>
+    </div>
+    <div class="dir"><span id="quem"></span><button class="sair" onclick="sair()">Sair</button></div>
+  </div>
+  <div class="conteudo" id="conteudo"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = 'https://xbhdkcspmetzcnulotqm.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_Vg3_5OI3GNuvb212VCTaWg_qk8sW2va';
+const DOMINIO = 'mamede.local';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const seg = t => { const m = /(\d+):(\d{2}):(\d{2})/.exec(t||''); return m ? (+m[1]*3600 + +m[2]*60 + +m[3]) : null; };
+function ytId(u){
+  if (!u) return '';
+  const m = /(?:v=|youtu\.be\/|\/embed\/|\/shorts\/)([A-Za-z0-9_-]{11})/.exec(u);
+  return m ? m[1] : (/^[A-Za-z0-9_-]{11}$/.test(u.trim()) ? u.trim() : '');
+}
+function fmtData(iso){ if(!iso) return ''; const d = new Date(iso); return isNaN(d) ? '' :
+  d.toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+let nivelUsuario = 0, meuId = null, timerLista = null;
+
+function mostra(qual){ $('#login').style.display = qual==='login'?'grid':'none'; $('#app').style.display = qual==='app'?'block':'none'; }
+function marcarAba(qual){
+  $('#abaLeiloes').classList.toggle('ativa', qual==='leiloes');
+  $('#abaUsuarios').classList.toggle('ativa', qual==='usuarios');
+}
+function irLeiloes(){ listar(); }
+function irUsuarios(){ usuariosView(); }
+
+async function iniciar(){
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session){ mostra('login'); return; }
+  const { data: perfil, error } = await sb.from('perfis')
+    .select('usuario, papel, nivel, ativo').eq('id', session.user.id).single();
+  if (error || !perfil){ await sb.auth.signOut(); mostra('login'); return; }
+  if (!perfil.ativo){ await sb.auth.signOut(); mostra('login'); $('#erro-login').textContent = 'acesso desativado, fale com o administrador'; return; }
+  nivelUsuario = perfil.nivel || 0;
+  meuId = session.user.id;
+  $('#quem').textContent = perfil.usuario + ' · ' + perfil.papel;
+  $('#abaUsuarios').style.display = nivelUsuario >= 3 ? '' : 'none';
+  mostra('app'); listar();
+}
+
+$('#form-login').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('#erro-login').textContent = '';
+  const u = $('#usuario').value.trim();
+  const email = u.includes('@') ? u : `${u}@${DOMINIO}`;
+  const { error } = await sb.auth.signInWithPassword({ email, password: $('#senha').value });
+  if (error){ $('#erro-login').textContent = 'usuário ou senha inválidos'; return; }
+  iniciar();
+});
+
+async function sair(){ await sb.auth.signOut(); $('#senha').value=''; mostra('login'); }
+
+async function listar(){
+  if (timerLista){ clearTimeout(timerLista); timerLista = null; }
+  $('#conteudo').classList.remove('largo');
+  marcarAba('leiloes');
+  const { data } = await sb.from('leiloes').select('*').order('id', { ascending:false });
+  const leiloes = data || [];
+  const podeCriar = nivelUsuario >= 2;
+  let html = '<h2>Leilões';
+  if (podeCriar) html += '<button class="novo-btn" onclick="toggleNovo()">+ Novo leilão</button>';
+  html += '</h2>';
+  if (podeCriar){
+    html += `<div class="novo-form" id="novoForm">
+      <input id="novoTitulo" placeholder="Título do leilão">
+      <input id="novoLink" placeholder="Link do vídeo (YouTube)">
+      <div class="linha"><button class="btn" style="width:auto" onclick="novoLeilao()">Puxar leilão</button>
+      <span class="m" id="novoMsg" style="color:var(--suave)"></span></div></div>`;
+  }
+  if (!leiloes.length) html += '<p style="color:var(--suave)">Nenhum leilão ainda.</p>';
+  let processando = false;
+  for (const l of leiloes){
+    let chip;
+    if (l.status === 'processando' || l.status === 'rodando'){ chip = '<span class="chip processando">processando...</span>'; processando = true; }
+    else if (l.status === 'erro'){ chip = `<span class="chip erro" title="${esc(l.erro)}">erro</span>`; }
+    else chip = `<span class="chip">${l.total_lotes} lotes</span>`;
+    const clicavel = l.status === 'pronto' ? `onclick="abrir(${l.id})"` : 'style="cursor:default;opacity:.85"';
+    html += `<div class="card-leilao" ${clicavel}>
+      <div><div class="t">${esc(l.titulo)}</div>
+      <div class="m">${esc(fmtData(l.criado_em))}${l.fonte ? ' · ' + esc(l.fonte) : ''}</div></div>
+      ${chip}</div>`;
+  }
+  $('#conteudo').innerHTML = html;
+  if (processando) timerLista = setTimeout(listar, 8000);
+}
+function toggleNovo(){ const f = $('#novoForm'); f.style.display = f.style.display === 'block' ? 'none' : 'block'; }
+async function novoLeilao(){
+  const titulo = $('#novoTitulo').value.trim(), link = $('#novoLink').value.trim();
+  if (!titulo || !link){ $('#novoMsg').textContent = 'preencha título e link'; return; }
+  $('#novoMsg').textContent = 'enviando...';
+  const { data: { user } } = await sb.auth.getUser();
+  const { error } = await sb.from('leiloes').insert({ titulo, fonte: link, status: 'processando', importado_por: user.id });
+  if (error){ $('#novoMsg').textContent = 'falha: ' + error.message; return; }
+  listar();
+}
+
+async function usuariosView(){
+  if (timerLista){ clearTimeout(timerLista); timerLista = null; }
+  $('#conteudo').classList.remove('largo');
+  marcarAba('usuarios');
+  const { data } = await sb.from('perfis').select('*').order('nivel', { ascending:false });
+  const us = data || [];
+  let html = '<h2>Usuários</h2>';
+  html += `<div class="form-user">
+    <div class="linha">
+      <input id="uNome" placeholder="Nome de usuário" autocomplete="off">
+      <input id="uSenha" type="password" placeholder="Senha (mínimo 8)" autocomplete="new-password">
+      <select id="uPapel">
+        <option value="funcionario">Funcionário</option>
+        <option value="gerente">Gerente</option>
+        <option value="admin">Administrador</option>
+      </select>
+      <button class="btn" style="width:auto" onclick="addUsuario()">Adicionar</button>
+    </div>
+    <div class="m" id="uMsg" style="color:var(--suave);margin-top:.6rem;min-height:1rem"></div>
+  </div>`;
+  html += '<div class="wrap usuarios"><table><thead><tr>' +
+    '<th>Usuário</th><th>Papel</th><th>Criado em</th><th>Status</th><th>Acesso</th>' +
+    '</tr></thead><tbody>';
+  for (const u of us){
+    const status = u.ativo ? '<span class="st ativo">ativo</span>' : '<span class="st inativo">inativo</span>';
+    let acao;
+    if (u.id === meuId) acao = '<span class="eu-tag">você</span>';
+    else if (u.ativo) acao = `<button class="mini-btn desativar" onclick="setAtivo('${u.id}',false)">Desativar</button>`;
+    else acao = `<button class="mini-btn ativar" onclick="setAtivo('${u.id}',true)">Ativar</button>`;
+    html += `<tr><td>${esc(u.usuario)}</td><td class="cap">${esc(u.papel)}</td>` +
+      `<td>${esc(fmtData(u.criado_em))}</td><td>${status}</td><td>${acao}</td></tr>`;
+  }
+  html += '</tbody></table></div>';
+  $('#conteudo').innerHTML = html;
+}
+async function addUsuario(){
+  const usuario = $('#uNome').value.trim(), senha = $('#uSenha').value, papel = $('#uPapel').value;
+  const m = $('#uMsg');
+  if (!usuario || senha.length < 8){ m.style.color = '#c0392b'; m.textContent = 'preencha o nome e uma senha de 8+ caracteres'; return; }
+  m.style.color = 'var(--suave)'; m.textContent = 'salvando...';
+  const { data, error } = await sb.functions.invoke('criar-usuario', { body: { usuario, senha, papel } });
+  if (error){ m.style.color = '#c0392b'; m.textContent = 'criar usuário ainda não foi publicado no servidor (falta o passo M4)'; return; }
+  if (data && data.erro){ m.style.color = '#c0392b'; m.textContent = data.erro; return; }
+  $('#uNome').value = ''; $('#uSenha').value = ''; $('#uPapel').value = 'funcionario';
+  usuariosView();
+}
+async function setAtivo(id, ativo){
+  const { error } = await sb.from('perfis').update({ ativo }).eq('id', id);
+  if (error){ const m = $('#uMsg'); if (m){ m.style.color = '#c0392b'; m.textContent = 'não foi possível atualizar (permissão ou você mesmo)'; } return; }
+  usuariosView();
+}
+
+async function abrir(id){
+  if (timerLista){ clearTimeout(timerLista); timerLista = null; }
+  $('#conteudo').classList.add('largo');
+  marcarAba('leiloes');
+  const { data: L } = await sb.from('leiloes').select('*').eq('id', id).single();
+  if (!L) return;
+  const { data: lotesData } = await sb.from('lotes').select('*').eq('leilao_id', id).order('lote');
+  const lotes = lotesData || [], vid = ytId(L.fonte);
+  const comComprador = lotes.filter(x => x.comprador).length;
+  const comValor = lotes.filter(x => x.valor_num != null).length;
+
+  const cols = [
+    ['lote','Lote','n'], ['valor_num','Valor','n'], ['comprador','Comprador','t'],
+    ['fazenda','Fazenda','t'], ['local','Cidade/UF','t'], ['com_quem','Com quem','t'],
+    ['vendedor','Vendedor','t'], ['timestamp','Horário','n'], ['trecho','Trecho','t']
+  ];
+  let th = cols.map(c => `<th data-t="${c[2]}">${c[1]}</th>`).join('');
+  let trs = '';
+  for (const x of lotes){
+    const local = [x.cidade, x.estado].filter(Boolean).join('/');
+    const s = seg(x.timestamp_video);
+    const hora = (vid && s!=null)
+      ? `<a href="https://www.youtube.com/watch?v=${encodeURIComponent(vid)}&t=${s}" target="_blank" rel="noopener">${esc(x.timestamp_video)}</a>`
+      : esc(x.timestamp_video||'');
+    const valor = x.valor_num != null ? x.valor_num : '';
+    trs += `<tr>
+      <td class="num" data-v="${x.lote}">${x.lote}</td>
+      <td class="num" data-v="${x.valor_num!=null?x.valor_num:0}">${valor}</td>
+      <td>${esc(x.comprador)}</td><td>${esc(x.fazenda)}</td><td>${esc(local)}</td>
+      <td>${esc(x.com_quem)}</td><td>${esc(x.vendedor)}</td>
+      <td data-v="${s!=null?s:0}">${hora}</td><td class="trecho">${esc(x.trecho)}</td></tr>`;
+  }
+  $('#conteudo').innerHTML = `
+    <button class="voltar" onclick="listar()">&#8592; voltar aos leilões</button>
+    <h2>${esc(L.titulo)}</h2>
+    <div class="cards">
+      <div class="mini"><b>${lotes.length}</b><span>lotes</span></div>
+      <div class="mini"><b>${comComprador}</b><span>com comprador</span></div>
+      <div class="mini"><b>${comValor}</b><span>com valor</span></div>
+    </div>
+    <input class="filtro" id="filtro" placeholder="filtrar por lote, comprador, cidade, assessor...">
+    <div class="wrap"><table id="tab"><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table></div>`;
+
+  const tab = $('#tab');
+  $('#filtro').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    for (const tr of tab.tBodies[0].rows) tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+  tab.querySelectorAll('th').forEach((th, i) => {
+    let asc = true;
+    th.addEventListener('click', () => {
+      const num = th.dataset.t === 'n';
+      const linhas = [...tab.tBodies[0].rows];
+      linhas.sort((a,b) => {
+        const x = num ? +(a.cells[i].dataset.v||0) : a.cells[i].textContent.toLowerCase();
+        const y = num ? +(b.cells[i].dataset.v||0) : b.cells[i].textContent.toLowerCase();
+        return (x<y?-1:x>y?1:0) * (asc?1:-1);
+      });
+      asc = !asc;
+      linhas.forEach(r => tab.tBodies[0].appendChild(r));
+    });
+  });
+}
+
+iniciar();
+</script>
+</body>
+</html>
