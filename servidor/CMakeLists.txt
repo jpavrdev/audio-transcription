@@ -29,6 +29,7 @@ add_executable(servidor
     src/auth.cpp
     src/rbac.cpp
     src/leiloes.cpp
+    src/importador.cpp
 )
 
 # drogon pro servidor web, pqxx/pq pro acesso sincrono, argon2 pro hash de senha

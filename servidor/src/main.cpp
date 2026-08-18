@@ -19,6 +19,7 @@
 #include "senha.h"
 #include "auth.h"
 #include "leiloes.h"
+#include "importador.h"
 
 namespace fs = std::filesystem;
 
@@ -110,6 +111,38 @@ static int criar_admin(const std::string& usuario) {
     return criar_usuario(usuario, "admin");
 }
 
+static int importar_csv(long id, const std::string& arquivo) {
+    try {
+        std::ifstream f(arquivo, std::ios::binary);
+        if (!f) { std::cerr << "arquivo nao encontrado: " << arquivo << "\n"; return 1; }
+        std::string csv((std::istreambuf_iterator<char>(f)), {});
+        pqxx::connection c(bd::conn_string());
+        pqxx::work w(c);
+        int total = inserir_lotes(w, id, csv);
+        w.exec_params("update leiloes set total_lotes=$1, status='pronto', erro=null where id=$2",
+                      total, id);
+        w.commit();
+        std::cout << "importados " << total << " lotes no leilao " << id << "\n";
+        return 0;
+    } catch (const std::exception& e) {
+        std::cerr << "erro ao importar: " << e.what() << "\n";
+        return 1;
+    }
+}
+
+static int marcar_erro(long id, const std::string& msg) {
+    try {
+        pqxx::connection c(bd::conn_string());
+        pqxx::work w(c);
+        w.exec_params("update leiloes set status='erro', erro=$1 where id=$2", msg, id);
+        w.commit();
+        return 0;
+    } catch (const std::exception& e) {
+        std::cerr << "erro: " << e.what() << "\n";
+        return 1;
+    }
+}
+
 static int servir() {
     auto& app = drogon::app();
     app.createDbClient(
@@ -126,12 +159,17 @@ static int servir() {
     registrar_auth();
     registrar_leiloes();
 
+    // serve as paginas web da pasta www (ao lado do binario)
+    char exe[4096];
+    ssize_t nexe = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
+    fs::path www = (nexe > 0)
+        ? fs::path(std::string(exe, nexe)).parent_path().parent_path() / "www"
+        : fs::path("www");
+    app.setDocumentRoot(www.string());
     app.registerHandler("/",
-        [](const drogon::HttpRequestPtr&,
-           std::function<void(const drogon::HttpResponsePtr&)>&& cb) {
-            auto resp = drogon::HttpResponse::newHttpResponse();
-            resp->setBody("painel de leiloes: servidor no ar");
-            cb(resp);
+        [www](const drogon::HttpRequestPtr&,
+              std::function<void(const drogon::HttpResponsePtr&)>&& cb) {
+            cb(drogon::HttpResponse::newFileResponse((www / "index.html").string()));
         });
 
     app.registerHandler("/saude",
@@ -162,7 +200,10 @@ int main(int argc, char** argv) {
     if (cmd == "migrar")        return migrar();
     if (cmd == "criar-admin")   return criar_admin(argc > 2 ? argv[2] : "");
     if (cmd == "criar-usuario") return criar_usuario(argc > 2 ? argv[2] : "", argc > 3 ? argv[3] : "");
+    if (cmd == "importar-csv")  return importar_csv(argc > 2 ? std::stol(argv[2]) : 0, argc > 3 ? argv[3] : "");
+    if (cmd == "marcar-erro")   return marcar_erro(argc > 2 ? std::stol(argv[2]) : 0, argc > 3 ? argv[3] : "");
     std::cerr << "uso: " << argv[0]
-              << " [servir|migrar|criar-admin <usuario>|criar-usuario <usuario> <papel>]\n";
+              << " [servir|migrar|criar-admin <u>|criar-usuario <u> <papel>"
+              << "|importar-csv <id> <arquivo>|marcar-erro <id> <msg>]\n";
     return 1;
 }
