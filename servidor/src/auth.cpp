@@ -100,6 +100,7 @@ void registrar_auth() {
             }
             Json::Value j;
             j["ok"] = true;
+            j["id"] = sessao->get<int64_t>("usuario_id");
             j["usuario"] = sessao->get<std::string>("nome_usuario");
             j["papel"] = sessao->get<std::string>("papel");
             j["nivel"] = sessao->get<int>("nivel");

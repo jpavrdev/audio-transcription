@@ -34,7 +34,13 @@ img{display:block}
 .topo{background:#fff;border-bottom:3px solid var(--ciano);display:flex;align-items:center;
   justify-content:space-between;padding:.55rem 1.2rem;position:sticky;top:0;z-index:10}
 .topo img{height:32px}
+.topo .esq{display:flex;align-items:center;gap:1.3rem}
 .topo .dir{display:flex;align-items:center;gap:.9rem;font-size:.85rem;color:var(--suave)}
+.abas{display:flex;gap:.4rem}
+.aba{background:none;border:none;font-size:.9rem;color:var(--suave);cursor:pointer;
+  padding:.5rem .3rem;border-bottom:2px solid transparent;font-weight:600}
+.aba:hover{color:var(--azul)}
+.aba.ativa{color:var(--azul);border-bottom-color:var(--ciano)}
 .sair{background:none;border:1px solid var(--borda);border-radius:6px;padding:.35rem .7rem;
   cursor:pointer;color:var(--azul);font-size:.8rem}
 .sair:hover{border-color:var(--ciano)}
@@ -60,6 +66,25 @@ h2{color:var(--azul);font-size:1.3rem;margin:.2rem 0 1rem}
 .novo-form input:focus{outline:none;border-color:var(--ciano)}
 .novo-form .linha{display:flex;gap:.8rem;align-items:center}
 
+/* pagina de usuarios */
+.form-user{background:#fff;border:1px solid var(--borda);border-radius:12px;padding:1rem;margin-bottom:1.1rem}
+.form-user .linha{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center}
+.form-user input,.form-user select{padding:.55rem .7rem;border:1px solid var(--borda);
+  border-radius:8px;font-size:.95rem;background:#fff;color:var(--texto)}
+.form-user input{flex:1;min-width:170px}
+.form-user input:focus,.form-user select:focus{outline:none;border-color:var(--ciano)}
+.st{font-size:.75rem;border-radius:20px;padding:.2rem .65rem;font-weight:600}
+.st.ativo{background:#e4f6ec;color:#1c7a3f}
+.st.inativo{background:#f6e5e5;color:#c0392b}
+.mini-btn{border:1px solid var(--borda);background:#fff;border-radius:6px;padding:.32rem .8rem;
+  font-size:.8rem;cursor:pointer;font-weight:600}
+.mini-btn.desativar{color:#c0392b}
+.mini-btn.desativar:hover{border-color:#c0392b;background:#fdf1f1}
+.mini-btn.ativar{color:#1c7a3f}
+.mini-btn.ativar:hover{border-color:#1c7a3f;background:#eef8f1}
+td.cap{text-transform:capitalize}
+.eu-tag{font-size:.8rem;color:var(--suave)}
+
 /* detalhe */
 .voltar{background:none;border:none;color:var(--azul);cursor:pointer;font-size:.9rem;padding:0;margin-bottom:.4rem}
 .cards{display:flex;flex-wrap:wrap;gap:.6rem;margin:.4rem 0 1rem}
@@ -73,6 +98,8 @@ table{border-collapse:collapse;width:100%;font-size:.84rem}
 th,td{padding:.5rem .6rem;text-align:left;border-bottom:1px solid var(--borda);white-space:nowrap;vertical-align:top}
 th{background:var(--azul);color:#fff;position:sticky;top:0;cursor:pointer;user-select:none}
 th:hover{background:var(--azul-esc)}
+.wrap.usuarios th{cursor:default}
+.wrap.usuarios th:hover{background:var(--azul)}
 td.num{text-align:right;font-variant-numeric:tabular-nums}
 td.trecho{white-space:normal;max-width:280px;color:var(--suave)}
 tr:hover td{background:#f0fafd}
@@ -95,7 +122,13 @@ a:hover{text-decoration:underline}
 
 <div id="app">
   <div class="topo">
-    <img src="/logo.png" alt="Mamede Assessoria">
+    <div class="esq">
+      <img src="/logo.png" alt="Mamede Assessoria">
+      <nav class="abas">
+        <button class="aba ativa" id="abaLeiloes" onclick="irLeiloes()">Leilões</button>
+        <button class="aba" id="abaUsuarios" onclick="irUsuarios()" style="display:none">Usuários</button>
+      </nav>
+    </div>
     <div class="dir"><span id="quem"></span><button class="sair" onclick="sair()">Sair</button></div>
   </div>
   <div class="conteudo" id="conteudo"></div>
@@ -105,7 +138,7 @@ a:hover{text-decoration:underline}
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const seg = t => { const m = /(\d+):(\d{2}):(\d{2})/.exec(t||''); return m ? (+m[1]*3600 + +m[2]*60 + +m[3]) : null; };
-let nivelUsuario = 0, timerLista = null;
+let nivelUsuario = 0, meuId = null, timerLista = null;
 
 async function api(metodo, url, corpo){
   const opt = { method: metodo, headers: {} };
@@ -115,10 +148,22 @@ async function api(metodo, url, corpo){
   return { status: r.status, j };
 }
 function mostra(qual){ $('#login').style.display = qual==='login'?'grid':'none'; $('#app').style.display = qual==='app'?'block':'none'; }
+function marcarAba(qual){
+  $('#abaLeiloes').classList.toggle('ativa', qual==='leiloes');
+  $('#abaUsuarios').classList.toggle('ativa', qual==='usuarios');
+}
+function irLeiloes(){ listar(); }
+function irUsuarios(){ usuariosView(); }
 
 async function iniciar(){
   const { status, j } = await api('GET','/eu');
-  if (status===200 && j && j.ok){ nivelUsuario = j.nivel || 0; $('#quem').textContent = j.usuario + ' · ' + j.papel; mostra('app'); listar(); }
+  if (status===200 && j && j.ok){
+    nivelUsuario = j.nivel || 0;
+    meuId = (j.id != null) ? j.id : null;
+    $('#quem').textContent = j.usuario + ' · ' + j.papel;
+    $('#abaUsuarios').style.display = nivelUsuario >= 3 ? '' : 'none';
+    mostra('app'); listar();
+  }
   else mostra('login');
 }
 
@@ -135,6 +180,7 @@ async function sair(){ await api('POST','/logout'); $('#senha').value=''; mostra
 async function listar(){
   if (timerLista){ clearTimeout(timerLista); timerLista = null; }
   $('#conteudo').classList.remove('largo');
+  marcarAba('leiloes');
   const { j } = await api('GET','/leiloes');
   const leiloes = (j && j.leiloes) || [];
   const podeCriar = nivelUsuario >= 2;
@@ -174,9 +220,60 @@ async function novoLeilao(){
   else $('#novoMsg').textContent = (j && j.erro) ? j.erro : 'falha';
 }
 
+async function usuariosView(){
+  if (timerLista){ clearTimeout(timerLista); timerLista = null; }
+  $('#conteudo').classList.remove('largo');
+  marcarAba('usuarios');
+  const { j } = await api('GET','/usuarios');
+  const us = (j && j.usuarios) || [];
+  let html = '<h2>Usuários</h2>';
+  html += `<div class="form-user">
+    <div class="linha">
+      <input id="uNome" placeholder="Nome de usuário" autocomplete="off">
+      <input id="uSenha" type="password" placeholder="Senha (mínimo 8)" autocomplete="new-password">
+      <select id="uPapel">
+        <option value="funcionario">Funcionário</option>
+        <option value="gerente">Gerente</option>
+        <option value="admin">Administrador</option>
+      </select>
+      <button class="btn" style="width:auto" onclick="addUsuario()">Adicionar</button>
+    </div>
+    <div class="m" id="uMsg" style="color:var(--suave);margin-top:.6rem;min-height:1rem"></div>
+  </div>`;
+  html += '<div class="wrap usuarios"><table><thead><tr>' +
+    '<th>Usuário</th><th>Papel</th><th>Criado em</th><th>Status</th><th>Acesso</th>' +
+    '</tr></thead><tbody>';
+  for (const u of us){
+    const status = u.ativo ? '<span class="st ativo">ativo</span>' : '<span class="st inativo">inativo</span>';
+    let acao;
+    if (u.id === meuId) acao = '<span class="eu-tag">você</span>';
+    else if (u.ativo) acao = `<button class="mini-btn desativar" onclick="setAtivo(${u.id},false)">Desativar</button>`;
+    else acao = `<button class="mini-btn ativar" onclick="setAtivo(${u.id},true)">Ativar</button>`;
+    html += `<tr><td>${esc(u.usuario)}</td><td class="cap">${esc(u.papel)}</td>` +
+      `<td>${esc(u.criado_em)}</td><td>${status}</td><td>${acao}</td></tr>`;
+  }
+  html += '</tbody></table></div>';
+  $('#conteudo').innerHTML = html;
+}
+async function addUsuario(){
+  const usuario = $('#uNome').value.trim(), senha = $('#uSenha').value, papel = $('#uPapel').value;
+  const m = $('#uMsg');
+  if (!usuario || senha.length < 8){ m.style.color = '#c0392b'; m.textContent = 'preencha o nome e uma senha de 8+ caracteres'; return; }
+  m.style.color = 'var(--suave)'; m.textContent = 'salvando...';
+  const { status, j } = await api('POST','/usuarios', { usuario, senha, papel });
+  if (status===200 && j && j.ok) usuariosView();
+  else { m.style.color = '#c0392b'; m.textContent = (j && j.erro) ? j.erro : 'falha ao adicionar'; }
+}
+async function setAtivo(id, ativo){
+  const { status, j } = await api('PATCH','/usuarios/'+id, { ativo });
+  if (status===200 && j && j.ok) usuariosView();
+  else { const m = $('#uMsg'); if (m){ m.style.color = '#c0392b'; m.textContent = (j && j.erro) ? j.erro : 'falha ao atualizar'; } }
+}
+
 async function abrir(id){
   if (timerLista){ clearTimeout(timerLista); timerLista = null; }
   $('#conteudo').classList.add('largo');
+  marcarAba('leiloes');
   const { j } = await api('GET','/leiloes/'+id);
   if (!j || !j.ok) return;
   const L = j.leilao, lotes = j.lotes || [], vid = (L.fonte||'').trim();

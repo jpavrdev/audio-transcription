@@ -20,6 +20,7 @@
 #include "auth.h"
 #include "leiloes.h"
 #include "importador.h"
+#include "usuarios.h"
 
 namespace fs = std::filesystem;
 
@@ -158,6 +159,7 @@ static int servir() {
     app.enableSession(3600);  // sessao de 1 hora por cookie
     registrar_auth();
     registrar_leiloes();
+    registrar_usuarios();
 
     // serve as paginas web da pasta www (ao lado do binario)
     char exe[4096];
