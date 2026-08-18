@@ -58,3 +58,14 @@ Gera `video.txt` e `video.srt` na mesma pasta do vídeo. O texto também aparece
     vídeo -> ffmpeg -> WAV 16kHz mono -> whisper.cpp -> texto e .srt
 
 A precisão vem do tamanho do modelo. A GPU não muda o texto, ela deixa rápido o suficiente pra usar um modelo grande sem sofrer.
+
+## Painel de leilões (servidor web)
+
+Além do transcritor de linha de comando, o projeto tem um painel web na pasta `servidor/`, onde a equipe faz login e puxa novos leilões colando o link do YouTube. Ele pega a legenda automática do vídeo, extrai os lotes com o Claude e mostra tudo numa tabela, com histórico e permissões por papel (admin, gerente, funcionário).
+
+Pra montar o painel num notebook Windows usando ele como servidor, veja `INSTALAR-WINDOWS.md`. Em Ubuntu ou WSL2 o atalho é:
+
+    ./scripts/instalar.sh     # instala tudo, compila, prepara o banco e cria o admin
+    ./scripts/iniciar.sh      # sobe o banco e o servidor em http://localhost:8080
+
+Quando o vídeo tem legenda automática o trabalho pesado fica fora do notebook (legenda do YouTube e extração pelo Claude), então roda bem até em máquina fraca. A transcrição local pelo whisper é só reserva pra vídeo sem legenda e fica lenta sem GPU.

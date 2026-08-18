@@ -9,7 +9,8 @@ set -uo pipefail
 ID="$1"; LINK="$2"; RAIZ="$3"
 SERV="$RAIZ/servidor/build/servidor"
 TRANS="$RAIZ/build/transcritor"
-MODELO="$RAIZ/models/ggml-large-v3-turbo.bin"
+# usa o modelo apontado em WHISPER_MODELO, ou o primeiro que existir em models/
+MODELO="${WHISPER_MODELO:-$(ls "$RAIZ"/models/ggml-*.bin 2>/dev/null | head -1)}"
 YTDLP="$HOME/.local/bin/yt-dlp"
 TRAB="$RAIZ/servidor/trabalho/$ID"
 mkdir -p "$TRAB"
@@ -25,7 +26,9 @@ if [ -n "$LEG" ]; then
     # caminho leve: legenda -> texto limpo
     python3 "$RAIZ/scripts/legenda_para_texto.py" "$LEG" "$TRAB/leilao" || falhar "conversao da legenda falhou"
 else
-    # sem legenda: baixa o audio e transcreve na gpu
+    # sem legenda: baixa o audio e transcreve localmente (cpu ou gpu, o que tiver)
+    [ -x "$TRANS" ] || falhar "sem legenda e o transcritor nao esta compilado neste servidor"
+    [ -n "$MODELO" ] || falhar "sem legenda e nenhum modelo whisper em models/"
     "$YTDLP" -f bestaudio --no-warnings -o "$TRAB/audio.%(ext)s" "$LINK" || falhar "download do audio falhou"
     AUDIO=$(ls "$TRAB"/audio.* 2>/dev/null | head -1)
     [ -n "$AUDIO" ] || falhar "audio nao encontrado apos o download"
