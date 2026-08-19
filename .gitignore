@@ -15,3 +15,8 @@
 /servidor/build/
 /servidor/.env
 /servidor/trabalho/
+
+# worker de extracao (supabase)
+/worker/.env
+/worker/trabalho/
+/worker/__pycache__/
