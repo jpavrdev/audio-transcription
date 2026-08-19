@@ -37,10 +37,11 @@ def _claude_base():
 def chamar_claude(texto):
     try:
         r = subprocess.run(_claude_base() + ['-p', PROMPT], input=texto,
-                           capture_output=True, text=True, timeout=900)
+                           capture_output=True, text=True,
+                           encoding='utf-8', errors='replace', timeout=900)
     except Exception as e:
         print(f"  claude falhou: {e}", file=sys.stderr); return []
-    out = r.stdout.strip()
+    out = (r.stdout or '').strip()
     out = re.sub(r'^```(json)?', '', out).strip()
     out = re.sub(r'```$', '', out).strip()
     a, b = out.find('['), out.rfind(']')
