@@ -1,18 +1,33 @@
 #!/usr/bin/env python3
-# worker de extracao do painel (arquitetura supabase).
-# fica de olho nos leiloes com status 'processando' no supabase, roda a extracao
-# (legenda ou whisper + claude) e grava os lotes de volta, marcando 'pronto' ou 'erro'.
-# usa a chave secret (service_role) pra passar por cima do RLS. roda no notebook.
-import os, sys, csv, json, time, subprocess, urllib.request, urllib.error
+# worker de extracao do painel (arquitetura supabase). roda no notebook, nativo no windows.
+# observa os leiloes 'processando' no supabase, roda a extracao (legenda + claude,
+# whisper opcional) e grava os lotes de volta. usa a chave secret (service_role).
+import os, sys, csv, json, glob, time, subprocess, urllib.request, urllib.error
+
+AQUI = os.path.dirname(os.path.abspath(__file__))
+
+
+def carregar_env(caminho):
+    # le worker/.env (KEY=VALUE) pro os.environ, pra funcionar sem 'source' no windows
+    if not os.path.exists(caminho):
+        return
+    with open(caminho, encoding="utf-8") as fh:
+        for linha in fh:
+            linha = linha.strip()
+            if not linha or linha.startswith("#") or "=" not in linha:
+                continue
+            k, v = linha.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+carregar_env(os.path.join(AQUI, ".env"))
 
 URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 KEY = os.environ.get("SUPABASE_SECRET_KEY", "")
-RAIZ = os.environ.get("RAIZ") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+RAIZ = os.environ.get("RAIZ") or os.path.dirname(AQUI)
 INTERVALO = int(os.environ.get("INTERVALO", "10"))
-TRAB = os.path.join(RAIZ, "worker", "trabalho")
-
-CAMPOS = ["lote", "valor", "valor_num", "comprador", "fazenda", "cidade",
-          "estado", "com_quem", "vendedor", "timestamp", "trecho"]
+YTDLP = os.environ.get("YTDLP", "yt-dlp")
+TRAB = os.path.join(AQUI, "trabalho")
 
 
 def rest(method, path, body=None, prefer=None):
@@ -32,7 +47,7 @@ def rest(method, path, body=None, prefer=None):
 
 
 def claim():
-    # pega o proximo 'processando' e marca 'rodando' de forma atomica.
+    # pega o proximo 'processando' e marca 'rodando' de forma atomica
     fila = rest("GET", "leiloes?status=eq.processando&select=id,fonte,titulo&order=id.asc&limit=1")
     if not fila:
         return None
@@ -40,6 +55,65 @@ def claim():
     got = rest("PATCH", f"leiloes?id=eq.{lid}&status=eq.processando",
                {"status": "rodando"}, prefer="return=representation")
     return got[0] if got else None  # vazio = outro worker pegou antes
+
+
+def transcritor_bin():
+    for nome in ("transcritor", "transcritor.exe"):
+        p = os.path.join(RAIZ, "build", nome)
+        if os.path.exists(p):
+            return p
+    return None
+
+
+def modelo_whisper():
+    ms = sorted(glob.glob(os.path.join(RAIZ, "models", "ggml-*.bin")))
+    return ms[0] if ms else None
+
+
+def gerar_csv(link, trab, log):
+    # produz trab/lotes.csv a partir do link. levanta em caso de erro.
+    py = sys.executable
+    base = os.path.join(trab, "leilao")
+
+    # 1. legenda automatica do youtube (leve, sem baixar audio)
+    subprocess.run([YTDLP, "--no-warnings", "--write-auto-subs",
+                    "--sub-langs", "pt-orig,pt,pt-BR", "--convert-subs", "srt",
+                    "--skip-download", "-o", os.path.join(trab, "legenda"), link],
+                   stdout=log, stderr=subprocess.STDOUT)
+    legs = glob.glob(os.path.join(trab, "legenda*.srt"))
+
+    if legs:
+        if subprocess.run([py, os.path.join(RAIZ, "scripts", "legenda_para_texto.py"), legs[0], base],
+                          stdout=log, stderr=subprocess.STDOUT).returncode != 0:
+            raise RuntimeError("conversao da legenda falhou")
+    else:
+        # sem legenda: precisa do whisper, que e opcional neste worker
+        trans, modelo = transcritor_bin(), modelo_whisper()
+        if not trans or not modelo:
+            raise RuntimeError("video sem legenda automatica e o whisper nao esta configurado neste worker")
+        if subprocess.run([YTDLP, "-f", "bestaudio", "--no-warnings",
+                           "-o", os.path.join(trab, "audio.%(ext)s"), link],
+                          stdout=log, stderr=subprocess.STDOUT).returncode != 0:
+            raise RuntimeError("download do audio falhou")
+        audios = glob.glob(os.path.join(trab, "audio.*"))
+        if not audios:
+            raise RuntimeError("audio nao encontrado apos o download")
+        if subprocess.run([trans, audios[0], "-m", modelo, "-l", "pt", "-o", base],
+                          stdout=log, stderr=subprocess.STDOUT).returncode != 0:
+            raise RuntimeError("transcricao falhou")
+        try:
+            os.remove(audios[0])
+        except OSError:
+            pass
+
+    # 2. extrai os lotes com o claude headless
+    csv_path = os.path.join(trab, "lotes.csv")
+    r = subprocess.run([py, os.path.join(RAIZ, "scripts", "extrair_ia.py"),
+                        base + ".txt", base + ".srt", "-o", csv_path],
+                       stdout=log, stderr=subprocess.STDOUT)
+    if r.returncode != 0 or not os.path.exists(csv_path):
+        raise RuntimeError("extracao falhou")
+    return csv_path
 
 
 def num(v, lote=None):
@@ -55,12 +129,8 @@ def processar(leilao):
     link = leilao.get("fonte") or ""
     trab = os.path.join(TRAB, str(lid))
     os.makedirs(trab, exist_ok=True)
-    with open(os.path.join(trab, "log.txt"), "w") as log:
-        rc = subprocess.run(["bash", os.path.join(RAIZ, "worker", "processar.sh"), link, RAIZ, trab],
-                            stdout=log, stderr=subprocess.STDOUT)
-    csv_path = os.path.join(trab, "lotes.csv")
-    if rc.returncode != 0 or not os.path.exists(csv_path):
-        raise RuntimeError(f"pipeline falhou (rc={rc.returncode}), veja worker/trabalho/{lid}/log.txt")
+    with open(os.path.join(trab, "log.txt"), "w", encoding="utf-8") as log:
+        csv_path = gerar_csv(link, trab, log)
 
     linhas = []
     with open(csv_path, encoding="utf-8") as fh:

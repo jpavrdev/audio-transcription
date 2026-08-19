@@ -2,7 +2,7 @@
 # extrai os lotes de um leilao chamando o claude code headless (claude -p) por pedaco.
 # uso: extrair_ia.py <txt> [srt] -o <csv> [--chunk N]
 # roda no plano do claude instalado na maquina. sem chave de api.
-import subprocess, json, re, csv, sys, argparse, os
+import subprocess, json, re, csv, sys, argparse, os, shutil
 
 PROMPT = ('Este texto e um trecho de transcricao automatica de um leilao de gado Nelore '
     '(tem erros de reconhecimento de voz). Cada linha comeca com o numero original no '
@@ -27,9 +27,16 @@ def parse_valor(v, lote):
     if nums: return nums[-1]                                # ignora o numero do lote
     return None
 
+def _claude_base():
+    # acha o claude no PATH (no windows pode ser .cmd, que precisa do cmd /c)
+    exe = os.environ.get('CLAUDE_BIN') or shutil.which('claude') or 'claude'
+    if os.name == 'nt' and exe.lower().endswith(('.cmd', '.bat')):
+        return ['cmd', '/c', exe]
+    return [exe]
+
 def chamar_claude(texto):
     try:
-        r = subprocess.run(['claude', '-p', PROMPT], input=texto,
+        r = subprocess.run(_claude_base() + ['-p', PROMPT], input=texto,
                            capture_output=True, text=True, timeout=900)
     except Exception as e:
         print(f"  claude falhou: {e}", file=sys.stderr); return []

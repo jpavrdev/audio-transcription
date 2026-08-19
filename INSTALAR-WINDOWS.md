@@ -1,91 +1,44 @@
-# Montar o painel num notebook Windows
+# Rodar o worker no notebook Windows
 
-O painel foi feito pra Linux. No Windows a gente roda ele dentro do WSL2, que e um Ubuntu de verdade rodando junto do Windows. Depois de montado, a equipe usa so pelo navegador, nao precisa mexer no terminal.
+Nesta arquitetura o notebook só roda o worker de extração, nativo no Windows, sem WSL2. O front (Vercel) e o banco (Supabase) já estão no ar. O worker é quem transforma um link em lotes.
 
-Esse guia e pra quem vai montar o servidor uma vez. Ja tem que estar logado numa conta do Windows com permissao de administrador.
+## Instalar (uma vez)
 
-## O que esse notebook aguenta
+1. **Python 3** (python.org). Na instalação, marque "Add python.exe to PATH".
+2. **Claude Code para Windows**. Depois abra o terminal e rode `claude` uma vez pra logar na conta Max. A extração depende disso.
+3. **ffmpeg**. No terminal: `winget install Gyan.FFmpeg` (ou baixe e ponha no PATH).
+4. **yt-dlp**. No terminal: `pip install -U --pre yt-dlp`.
+5. **O projeto**. Baixe o repositório (no GitHub, Code > Download ZIP, ou `git clone`) e extraia numa pasta.
 
-O caso normal (leilao do YouTube com legenda automatica) roda tranquilo, porque a legenda vem pronta do YouTube e a extracao roda nos servidores da Anthropic pelo Claude. O local so orquestra.
+## Configurar
 
-O ponto fraco e a reserva: se o video nao tiver legenda, o notebook transcreve o audio na CPU, e num i5 com 8GB isso fica lento pra video longo. Entao o ideal e sempre usar links com legenda automatica. A transcricao local existe so pra nao travar de vez, nao pra ser o dia a dia.
+Na pasta do projeto, copie `worker\.env.example` para `worker\.env` e preencha:
 
-## 1. Instalar o WSL2 com Ubuntu
+    SUPABASE_URL=https://xbhdkcspmetzcnulotqm.supabase.co
+    SUPABASE_SECRET_KEY=sb_secret_...
 
-Abra o PowerShell como administrador e rode:
+A secret key é a que você regenerou no Supabase. Ela fica só nesse arquivo, no notebook.
 
-    wsl --install -d Ubuntu
+## Testar e rodar
 
-Reinicie o notebook quando ele pedir. Ao abrir o Ubuntu pela primeira vez, crie um usuario e uma senha do Linux (nao e a mesma do Windows).
+Abra o terminal (cmd ou PowerShell) na pasta do projeto:
 
-Com 8GB de RAM vale limitar o WSL pra ele nao brigar com o Windows. Crie o arquivo `C:\Users\SEU_USUARIO\.wslconfig` com este conteudo:
+    python worker\testar.py     (tem que dizer "chave secret valida")
+    python worker\worker.py     (sobe o worker; ou dois cliques em worker\rodar.bat)
 
-    [wsl2]
-    memory=6GB
-    swap=4GB
+Com o worker rodando, cole um link no painel do Vercel: em segundos o leilão vira "pronto" com os lotes.
 
-Depois rode `wsl --shutdown` no PowerShell e abra o Ubuntu de novo. Isso da folga pra compilar.
+Se `python` não for encontrado, tente `py` no lugar: `py worker\testar.py`.
 
-## 2. Pegar o projeto
+## Deixar rodando sozinho
 
-Dentro do Ubuntu (o terminal do WSL):
+No Agendador de Tarefas do Windows, crie uma tarefa "Ao iniciar o computador" com a ação:
 
-    sudo apt update && sudo apt install -y git
-    git clone git@github.com:jpavrdev/audio-transcription.git
-    cd audio-transcription
+    Programa: python
+    Argumentos: C:\caminho\do\projeto\worker\worker.py
 
-Se ainda nao tiver chave SSH no GitHub desse notebook, da pra clonar por https:
+Ou aponte pro `worker\rodar.bat`.
 
-    git clone https://github.com/jpavrdev/audio-transcription.git
+## Vídeo sem legenda
 
-## 3. Instalar e logar o Claude Code
-
-A extracao dos lotes usa o Claude Code no plano Max. Instale o Claude Code dentro do Ubuntu do WSL (a mesma forma que foi instalado na maquina de desenvolvimento) e rode uma vez pra logar:
-
-    claude
-
-Faca o login na conta Max. Sem isso a extracao nao roda.
-
-## 4. Instalar o painel
-
-Ainda dentro da pasta do projeto:
-
-    ./scripts/instalar.sh
-
-Ele instala as dependencias, compila o servidor e o transcritor, prepara o banco Postgres, aplica as migrations e pede a senha do admin. A primeira compilacao do Drogon demora, e normal.
-
-## 5. Subir o painel
-
-    ./scripts/iniciar.sh
-
-Vai aparecer `servidor em http://localhost:8080`. Abra esse endereco no navegador do proprio notebook e entre com o usuario `admin`.
-
-## Acessar de outros aparelhos na mesma rede
-
-Se a equipe vai abrir o painel de outros computadores ou celulares na mesma rede, o Windows precisa repassar a porta pro WSL. No PowerShell como administrador:
-
-    netsh interface portproxy add v4tov4 listenport=8080 listenaddress=0.0.0.0 connectport=8080 connectaddress=$(wsl hostname -I)
-    netsh advfirewall firewall add rule name="painel leiloes" dir=in action=allow protocol=TCP localport=8080
-
-Depois descubra o IP do notebook na rede (`ipconfig`, procure o IPv4) e os outros aparelhos acessam em `http://IP_DO_NOTEBOOK:8080`.
-
-No Windows 11 da pra evitar isso ligando a rede espelhada: no `.wslconfig`, na secao `[wsl2]`, adicione `networkingMode=mirrored`, rode `wsl --shutdown` e suba de novo.
-
-## Deixar subindo sozinho
-
-O jeito simples e uma tarefa agendada do Windows que sobe o painel quando o notebook liga. No Agendador de Tarefas, crie uma tarefa que roda ao iniciar o Windows com:
-
-    Programa:    wsl
-    Argumentos:  -d Ubuntu -u SEU_USUARIO_LINUX -- /home/SEU_USUARIO_LINUX/audio-transcription/scripts/iniciar.sh
-
-Ajuste os nomes de usuario e o caminho.
-
-## Atualizar depois
-
-Quando sair mudanca nova no projeto:
-
-    cd audio-transcription
-    git pull
-    ./scripts/instalar.sh
-
-O instalar.sh pode rodar de novo sem problema, ele reaproveita o que ja existe.
+O worker usa a legenda automática do YouTube, que cobre as lives de leilão. Vídeo sem legenda cai como "erro", porque o whisper não vem no modo Windows nativo. Se virar necessidade, dá pra adicionar o whisper depois.

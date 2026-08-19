@@ -1,7 +1,24 @@
 #!/usr/bin/env python3
 # checagem rapida de conexao com o supabase antes de rodar o worker.
 # confirma que a chave e a SECRET (nao a publishable) e que da pra ler as tabelas.
-import os, sys, json, urllib.request, urllib.error
+import os, sys, json, shutil, urllib.request, urllib.error
+
+AQUI = os.path.dirname(os.path.abspath(__file__))
+
+
+def carregar_env(caminho):
+    if not os.path.exists(caminho):
+        return
+    with open(caminho, encoding="utf-8") as fh:
+        for linha in fh:
+            linha = linha.strip()
+            if not linha or linha.startswith("#") or "=" not in linha:
+                continue
+            k, v = linha.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+carregar_env(os.path.join(AQUI, ".env"))
 
 URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 KEY = os.environ.get("SUPABASE_SECRET_KEY", "")
@@ -39,4 +56,12 @@ if not perfis:
     sys.exit(1)
 
 print(f"ok! chave secret valida. {len(perfis)} usuario(s), {len(leiloes)} leilao(oes).")
-print("pode rodar o worker com  ./worker/rodar.sh")
+
+faltando = [t for t in ("yt-dlp", "ffmpeg", "claude") if not shutil.which(t)]
+if faltando:
+    print("atencao: nao encontrei no PATH:", ", ".join(faltando))
+    print("instale eles (veja INSTALAR-WINDOWS.md), senao a extracao vai falhar.")
+else:
+    print("ferramentas ok: yt-dlp, ffmpeg e claude no PATH.")
+
+print("pode rodar o worker com  python worker\\worker.py  (ou dois cliques no rodar.bat)")
