@@ -97,6 +97,18 @@ td.cap{text-transform:capitalize}
 .mini span{font-size:.75rem;color:var(--suave)}
 .filtro{padding:.55rem .7rem;border:1px solid var(--borda);border-radius:8px;width:min(360px,100%);
   font-size:1rem;margin-bottom:.7rem}
+.controles{display:flex;gap:.7rem;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:.7rem}
+.controles .filtro{margin-bottom:0;flex:1}
+.baixar-wrap{position:relative}
+.baixar-btn{background:var(--azul);color:#fff;border:none;border-radius:8px;padding:.55rem 1rem;
+  font-size:.9rem;cursor:pointer;font-weight:600;white-space:nowrap}
+.baixar-btn:hover{background:var(--azul-esc)}
+.baixar-menu{position:absolute;right:0;top:calc(100% + .35rem);background:#fff;border:1px solid var(--borda);
+  border-radius:8px;box-shadow:0 8px 22px rgba(0,84,147,.15);display:none;overflow:hidden;z-index:15;min-width:130px}
+.baixar-menu.aberto{display:block}
+.baixar-menu button{display:block;width:100%;text-align:left;background:none;border:none;
+  padding:.55rem .9rem;font-size:.88rem;cursor:pointer;color:var(--texto)}
+.baixar-menu button:hover{background:var(--bg);color:var(--azul)}
 .wrap{overflow-x:auto;background:#fff;border:1px solid var(--borda);border-radius:12px}
 table{border-collapse:collapse;width:100%;font-size:.84rem}
 th,td{padding:.5rem .6rem;text-align:left;border-bottom:1px solid var(--borda);white-space:nowrap;vertical-align:top}
@@ -155,7 +167,7 @@ function ytId(u){
 }
 function fmtData(iso){ if(!iso) return ''; const d = new Date(iso); return isNaN(d) ? '' :
   d.toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
-let nivelUsuario = 0, meuId = null, timerLista = null;
+let nivelUsuario = 0, meuId = null, timerLista = null, dadosLeilao = null;
 
 function mostra(qual){ $('#login').style.display = qual==='login'?'grid':'none'; $('#app').style.display = qual==='app'?'block':'none'; }
 function marcarAba(qual){
@@ -243,6 +255,61 @@ async function retentar(id){
   listar();
 }
 
+function toggleBaixar(e){ if (e) e.stopPropagation(); const m = $('#baixarMenu'); if (m) m.classList.toggle('aberto'); }
+document.addEventListener('click', () => { const m = $('#baixarMenu'); if (m) m.classList.remove('aberto'); });
+
+function carregarScript(src){
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) return resolve();
+    const s = document.createElement('script');
+    s.src = src; s.onload = () => resolve(); s.onerror = () => reject(new Error('falha ao carregar ' + src));
+    document.head.appendChild(s);
+  });
+}
+function _colsExport(){ return ['Lote','Valor','Comprador','Fazenda','Cidade/UF','Com quem','Vendedor','Horário','Trecho']; }
+function _linhasExport(){
+  return (dadosLeilao?.lotes || []).map(x => [
+    x.lote ?? '', x.valor_num ?? '', x.comprador || '', x.fazenda || '',
+    [x.cidade, x.estado].filter(Boolean).join('/'), x.com_quem || '', x.vendedor || '',
+    x.timestamp_video || '', x.trecho || ''
+  ]);
+}
+function _nomeArquivo(){
+  const t = (dadosLeilao?.L?.titulo || 'leilao').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  return t || 'leilao';
+}
+async function baixarExcel(){
+  if (!dadosLeilao) return;
+  const m = $('#baixarMenu'); if (m) m.classList.remove('aberto');
+  try {
+    await carregarScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
+    const ws = XLSX.utils.aoa_to_sheet([_colsExport(), ..._linhasExport()]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Lotes');
+    XLSX.writeFile(wb, _nomeArquivo() + '.xlsx');
+  } catch (e) { console.error(e); alert('não consegui gerar o Excel: ' + e.message); }
+}
+async function baixarPDF(){
+  if (!dadosLeilao) return;
+  const m = $('#baixarMenu'); if (m) m.classList.remove('aberto');
+  try {
+    await carregarScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js');
+    await carregarScript('https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js');
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+    doc.setFontSize(13); doc.setTextColor(0, 84, 147);
+    doc.text(dadosLeilao.L.titulo || 'Leilão', 40, 32);
+    doc.autoTable({
+      head: [_colsExport()], body: _linhasExport(), startY: 44,
+      styles: { fontSize: 7, cellPadding: 3, overflow: 'linebreak' },
+      headStyles: { fillColor: [0, 84, 147] },
+      columnStyles: { 8: { cellWidth: 150 } },
+      margin: { left: 40, right: 40 }
+    });
+    doc.save(_nomeArquivo() + '.pdf');
+  } catch (e) { console.error(e); alert('não consegui gerar o PDF: ' + e.message); }
+}
+
 async function usuariosView(){
   if (timerLista){ clearTimeout(timerLista); timerLista = null; }
   $('#conteudo').classList.remove('largo');
@@ -303,6 +370,7 @@ async function abrir(id){
   if (!L) return;
   const { data: lotesData } = await sb.from('lotes').select('*').eq('leilao_id', id).order('lote');
   const lotes = lotesData || [], vid = ytId(L.fonte);
+  dadosLeilao = { L, lotes };
   const comComprador = lotes.filter(x => x.comprador).length;
   const comValor = lotes.filter(x => x.valor_num != null).length;
 
@@ -335,7 +403,16 @@ async function abrir(id){
       <div class="mini"><b>${comComprador}</b><span>com comprador</span></div>
       <div class="mini"><b>${comValor}</b><span>com valor</span></div>
     </div>
-    <input class="filtro" id="filtro" placeholder="filtrar por lote, comprador, cidade, assessor...">
+    <div class="controles">
+      <input class="filtro" id="filtro" placeholder="filtrar por lote, comprador, cidade, assessor...">
+      <div class="baixar-wrap">
+        <button class="baixar-btn" onclick="toggleBaixar(event)">Baixar &#9662;</button>
+        <div class="baixar-menu" id="baixarMenu">
+          <button onclick="baixarPDF()">PDF</button>
+          <button onclick="baixarExcel()">Excel</button>
+        </div>
+      </div>
+    </div>
     <div class="wrap"><table id="tab"><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table></div>`;
 
   const tab = $('#tab');
