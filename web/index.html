@@ -59,6 +59,10 @@ h2{color:var(--azul);font-size:1.3rem;margin:.2rem 0 1rem}
 .chip.processando{background:var(--ciano);animation:pulsa 1.2s infinite}
 .chip.erro{background:#c0392b}
 @keyframes pulsa{0%,100%{opacity:1}50%{opacity:.45}}
+.dir-card{display:flex;align-items:center;gap:.5rem}
+.retry-btn{background:#fff;border:1px solid var(--borda);color:var(--azul);border-radius:6px;
+  padding:.28rem .7rem;font-size:.78rem;cursor:pointer;font-weight:600}
+.retry-btn:hover{border-color:var(--ciano)}
 .novo-btn{background:var(--azul);color:#fff;border:none;border-radius:8px;padding:.45rem .9rem;font-size:.85rem;cursor:pointer;font-weight:600;float:right}
 .novo-btn:hover{background:var(--azul-esc)}
 .novo-form{background:#fff;border:1px solid var(--borda);border-radius:12px;padding:1rem;margin-bottom:1rem;display:none}
@@ -207,15 +211,18 @@ async function listar(){
   if (!leiloes.length) html += '<p style="color:var(--suave)">Nenhum leilão ainda.</p>';
   let processando = false;
   for (const l of leiloes){
-    let chip;
+    let chip, extra = '';
     if (l.status === 'processando' || l.status === 'rodando'){ chip = '<span class="chip processando">processando...</span>'; processando = true; }
-    else if (l.status === 'erro'){ chip = `<span class="chip erro" title="${esc(l.erro)}">erro</span>`; }
+    else if (l.status === 'erro'){
+      chip = `<span class="chip erro" title="${esc(l.erro)}">erro</span>`;
+      if (podeCriar) extra = `<button class="retry-btn" onclick="event.stopPropagation();retentar(${l.id})">retentar</button>`;
+    }
     else chip = `<span class="chip">${l.total_lotes} lotes</span>`;
     const clicavel = l.status === 'pronto' ? `onclick="abrir(${l.id})"` : 'style="cursor:default;opacity:.85"';
     html += `<div class="card-leilao" ${clicavel}>
       <div><div class="t">${esc(l.titulo)}</div>
       <div class="m">${esc(fmtData(l.criado_em))}${l.fonte ? ' · ' + esc(l.fonte) : ''}</div></div>
-      ${chip}</div>`;
+      <div class="dir-card">${extra}${chip}</div></div>`;
   }
   $('#conteudo').innerHTML = html;
   if (processando) timerLista = setTimeout(listar, 8000);
@@ -228,6 +235,11 @@ async function novoLeilao(){
   const { data: { user } } = await sb.auth.getUser();
   const { error } = await sb.from('leiloes').insert({ titulo, fonte: link, status: 'processando', importado_por: user.id });
   if (error){ $('#novoMsg').textContent = 'falha: ' + error.message; return; }
+  listar();
+}
+async function retentar(id){
+  const { error } = await sb.from('leiloes').update({ status: 'processando', erro: null }).eq('id', id);
+  if (error) console.error('retentar', error);
   listar();
 }
 

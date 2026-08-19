@@ -95,6 +95,12 @@ drop policy if exists leiloes_insert on public.leiloes;
 create policy leiloes_insert on public.leiloes for insert
   with check (public.meu_nivel() >= 2 and importado_por = auth.uid());
 
+-- gerente+ pode retentar um leilao que deu erro: so a transicao erro -> processando
+drop policy if exists leiloes_retentar on public.leiloes;
+create policy leiloes_retentar on public.leiloes for update
+  using (public.meu_nivel() >= 2 and status = 'erro')
+  with check (public.meu_nivel() >= 2 and status = 'processando');
+
 -- lotes: qualquer usuario ativo ve. quem grava e o worker, que usa a chave de
 -- servico e passa por cima do RLS, entao nao precisa de policy de escrita aqui.
 drop policy if exists lotes_select on public.lotes;
