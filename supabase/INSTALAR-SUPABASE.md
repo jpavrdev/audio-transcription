@@ -34,3 +34,19 @@ Em Project Settings > API:
 - **service_role key**: é secreta, passa por cima de todas as regras. Ela vai só no worker do notebook, num arquivo local fora do git. Nunca ponha no front, no repositório, nem cole no chat.
 
 Depois de rodar isso, me mande a Project URL e a anon key que eu ligo o front no próximo passo.
+
+## 6. Publicar a function criar-usuario (criar usuário pelo painel)
+
+O botão Adicionar da aba Usuários chama uma Edge Function que cria a conta com privilégio. Ela usa a service key do lado do servidor do Supabase (nunca no navegador) e só deixa admin criar (confere o papel de quem chamou). A service key ela pega sozinha do ambiente, você não configura nada.
+
+Pelo dashboard (mais simples):
+1. Edge Functions no menu, Create a new function (ou Deploy a new function).
+2. Nome: `criar-usuario`
+3. Cole o conteúdo de `supabase/functions/criar-usuario/index.ts` e Deploy.
+
+Ou pela CLI:
+1. Instale a Supabase CLI e faça login: `supabase login`
+2. `supabase link --project-ref xbhdkcspmetzcnulotqm`
+3. `supabase functions deploy criar-usuario`
+
+Depois de publicada, o botão Adicionar passa a criar usuário de verdade.
