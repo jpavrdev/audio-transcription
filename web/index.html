@@ -181,12 +181,12 @@ async function iniciar(){
   const { data: { session } } = await sb.auth.getSession();
   if (!session){ mostra('login'); return; }
   const { data: perfil, error } = await sb.from('perfis')
-    .select('usuario, papel, nivel, ativo').eq('id', session.user.id).single();
+    .select('usuario, papel, nivel, ativo, unidade').eq('id', session.user.id).single();
   if (error || !perfil){ await sb.auth.signOut(); mostra('login'); return; }
   if (!perfil.ativo){ await sb.auth.signOut(); mostra('login'); $('#erro-login').textContent = 'acesso desativado, fale com o administrador'; return; }
   nivelUsuario = perfil.nivel || 0;
   meuId = session.user.id;
-  $('#quem').textContent = perfil.usuario + ' · ' + perfil.papel;
+  $('#quem').textContent = perfil.usuario + ' · ' + perfil.papel + (perfil.unidade ? ' · ' + perfil.unidade : '');
   $('#abaUsuarios').style.display = nivelUsuario >= 3 ? '' : 'none';
   mostra('app'); listar();
 }

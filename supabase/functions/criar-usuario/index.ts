@@ -32,9 +32,9 @@ Deno.serve(async (req) => {
     const { data: { user } } = await comoUsuario.auth.getUser()
     if (!user) return json({ erro: 'nao autenticado' })
 
-    // so admin ativo pode criar usuario
+    // so admin ativo pode criar usuario; o novo usuario herda a unidade do admin
     const admin = createClient(url, service)
-    const { data: perfil } = await admin.from('perfis').select('papel, ativo').eq('id', user.id).single()
+    const { data: perfil } = await admin.from('perfis').select('papel, ativo, unidade').eq('id', user.id).single()
     if (!perfil || !perfil.ativo || perfil.papel !== 'admin') {
       return json({ erro: 'apenas admin pode criar usuarios' })
     }
@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
       email,
       password: senha,
       email_confirm: true,
-      user_metadata: { papel },
+      user_metadata: { papel, unidade: perfil.unidade },
     })
     if (error) {
       const msg = /already|exist|registered/i.test(error.message)
