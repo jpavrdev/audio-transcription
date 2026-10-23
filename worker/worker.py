@@ -27,7 +27,19 @@ KEY = os.environ.get("SUPABASE_SECRET_KEY", "")
 RAIZ = os.environ.get("RAIZ") or os.path.dirname(AQUI)
 INTERVALO = int(os.environ.get("INTERVALO", "10"))
 YTDLP = os.environ.get("YTDLP", "yt-dlp")
+YTDLP_PROXY = os.environ.get("YTDLP_PROXY", "")
+YTDLP_COOKIES = os.environ.get("YTDLP_COOKIES", "")
 TRAB = os.path.join(AQUI, "trabalho")
+
+
+def ytdlp_base():
+    # comando base do yt-dlp, com proxy e cookies se estiverem configurados no .env
+    cmd = [YTDLP]
+    if YTDLP_PROXY:
+        cmd += ["--proxy", YTDLP_PROXY]
+    if YTDLP_COOKIES:
+        cmd += ["--cookies", YTDLP_COOKIES]
+    return cmd
 
 
 def rest(method, path, body=None, prefer=None):
@@ -76,7 +88,7 @@ def gerar_csv(link, trab, log):
     base = os.path.join(trab, "leilao")
 
     # 1. legenda automatica do youtube (leve, sem baixar audio)
-    subprocess.run([YTDLP, "--no-warnings", "--write-auto-subs",
+    subprocess.run(ytdlp_base() + ["--no-warnings", "--write-auto-subs",
                     "--sub-langs", "pt-orig,pt,pt-BR", "--convert-subs", "srt",
                     "--skip-download", "-o", os.path.join(trab, "legenda"), link],
                    stdout=log, stderr=subprocess.STDOUT)
@@ -91,7 +103,7 @@ def gerar_csv(link, trab, log):
         trans, modelo = transcritor_bin(), modelo_whisper()
         if not trans or not modelo:
             raise RuntimeError("video sem legenda automatica e o whisper nao esta configurado neste worker")
-        if subprocess.run([YTDLP, "-f", "bestaudio", "--no-warnings",
+        if subprocess.run(ytdlp_base() + ["-f", "bestaudio", "--no-warnings",
                            "-o", os.path.join(trab, "audio.%(ext)s"), link],
                           stdout=log, stderr=subprocess.STDOUT).returncode != 0:
             raise RuntimeError("download do audio falhou")
