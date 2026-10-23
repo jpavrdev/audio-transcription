@@ -33,8 +33,8 @@ TRAB = os.path.join(AQUI, "trabalho")
 
 
 def ytdlp_base():
-    # comando base do yt-dlp, com proxy e cookies se estiverem configurados no .env
-    cmd = [YTDLP]
+    # comando base do yt-dlp. timeout curto pra nao pendurar no proxy, e proxy/cookies do .env
+    cmd = [YTDLP, "--socket-timeout", "30", "--retries", "5"]
     if YTDLP_PROXY:
         cmd += ["--proxy", YTDLP_PROXY]
     if YTDLP_COOKIES:
@@ -88,10 +88,13 @@ def gerar_csv(link, trab, log):
     base = os.path.join(trab, "leilao")
 
     # 1. legenda automatica do youtube (leve, sem baixar audio)
-    subprocess.run(ytdlp_base() + ["--no-warnings", "--write-auto-subs",
-                    "--sub-langs", "pt-orig,pt,pt-BR", "--convert-subs", "srt",
-                    "--skip-download", "-o", os.path.join(trab, "legenda"), link],
-                   stdout=log, stderr=subprocess.STDOUT)
+    try:
+        subprocess.run(ytdlp_base() + ["--no-warnings", "--write-auto-subs",
+                        "--sub-langs", "pt-orig,pt,pt-BR", "--convert-subs", "srt",
+                        "--skip-download", "-o", os.path.join(trab, "legenda"), link],
+                       stdout=log, stderr=subprocess.STDOUT, timeout=300)
+    except subprocess.TimeoutExpired:
+        pass  # legenda demorou demais (proxy pendurou): segue sem ela (whisper ou erro)
     legs = glob.glob(os.path.join(trab, "legenda*.srt"))
 
     if legs:
