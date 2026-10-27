@@ -18,6 +18,13 @@ PROMPT = ('Este texto e um trecho de transcricao automatica de um leilao de gado
 
 CAMPOS = ['valor', 'comprador', 'fazenda', 'cidade', 'estado', 'com_quem', 'vendedor']
 
+
+class ClaudeIndisponivel(Exception):
+    """o claude nao rodou de verdade nesta maquina (nao instalado, sem login,
+    timeout ou saida de erro). serve pra abortar a extracao com erro, em vez de
+    gravar 0 lotes em silencio e deixar o leilao marcado como pronto."""
+
+
 def parse_valor(v, lote):
     if not v: return None
     s = str(v).strip()
@@ -34,13 +41,38 @@ def _claude_base():
         return ['cmd', '/c', exe]
     return [exe]
 
+def verificar_claude():
+    # ping curto: garante que o claude responde ANTES de processar o leilao.
+    # numa maquina sem o claude logado isso falha na hora (vira erro no painel),
+    # em vez de devolver 0 lotes em silencio e marcar o leilao como pronto.
+    try:
+        r = subprocess.run(_claude_base() + ['-p', 'responda apenas com a palavra: pong'],
+                           input='', capture_output=True, text=True,
+                           encoding='utf-8', errors='replace', timeout=180)
+    except FileNotFoundError:
+        raise ClaudeIndisponivel("claude nao esta no PATH (instale o Claude Code e rode 'claude' uma vez pra logar)")
+    except subprocess.TimeoutExpired:
+        raise ClaudeIndisponivel("claude nao respondeu o ping em 180s")
+    if r.returncode != 0 or 'pong' not in (r.stdout or '').lower():
+        raise ClaudeIndisponivel("claude nao respondeu o ping (provavel falta de login): "
+                                 + (r.stderr or r.stdout or '').strip()[:200])
+
+
 def chamar_claude(texto):
+    # roda o claude num pedaco. erros de execucao (sem binario, timeout, saida != 0)
+    # viram ClaudeIndisponivel pra abortar a extracao. lista vazia aqui significa
+    # de verdade "esse trecho nao tinha lotes".
     try:
         r = subprocess.run(_claude_base() + ['-p', PROMPT], input=texto,
                            capture_output=True, text=True,
                            encoding='utf-8', errors='replace', timeout=900)
-    except Exception as e:
-        print(f"  claude falhou: {e}", file=sys.stderr); return []
+    except FileNotFoundError:
+        raise ClaudeIndisponivel("claude sumiu do PATH durante a extracao")
+    except subprocess.TimeoutExpired:
+        raise ClaudeIndisponivel("claude estourou 900s num pedaco")
+    if r.returncode != 0:
+        raise ClaudeIndisponivel(f"claude saiu com erro {r.returncode}: "
+                                 + (r.stderr or r.stdout or '').strip()[:200])
     out = (r.stdout or '').strip()
     out = re.sub(r'^```(json)?', '', out).strip()
     out = re.sub(r'```$', '', out).strip()
@@ -73,27 +105,38 @@ def main():
     ap.add_argument('--chunk', type=int, default=4000)
     a = ap.parse_args()
 
+    # aborta cedo se o claude nao estiver funcionando nesta maquina
+    try:
+        verificar_claude()
+    except ClaudeIndisponivel as e:
+        print(f"ERRO: {e}", file=sys.stderr)
+        sys.exit(2)
+
     linhas = [l.rstrip('\n') for l in open(a.txt, encoding='utf-8')]
     numeradas = [f"{i + 1}:{t}" for i, t in enumerate(linhas)]
     ts = carrega_srt(a.srt) if (a.srt and os.path.exists(a.srt)) else {}
 
     by = {}
     n = (len(numeradas) + a.chunk - 1) // a.chunk
-    for c in range(n):
-        pedaco = "\n".join(numeradas[c * a.chunk:(c + 1) * a.chunk])
-        print(f"pedaco {c + 1}/{n}...", file=sys.stderr)
-        for r in chamar_claude(pedaco):
-            try:
-                lote = int(r.get('lote'))
-            except (TypeError, ValueError):
-                continue
-            e = by.setdefault(lote, {'lote': lote, 'linha': None, 'trecho': None,
-                                     **{k: None for k in CAMPOS}})
-            for k in CAMPOS:
-                if not e[k] and r.get(k): e[k] = str(r[k]).strip()
-            ln = r.get('linha')
-            if isinstance(ln, int) and (e['linha'] is None or ln < e['linha']):
-                e['linha'] = ln; e['trecho'] = r.get('trecho')
+    try:
+        for c in range(n):
+            pedaco = "\n".join(numeradas[c * a.chunk:(c + 1) * a.chunk])
+            print(f"pedaco {c + 1}/{n}...", file=sys.stderr)
+            for r in chamar_claude(pedaco):
+                try:
+                    lote = int(r.get('lote'))
+                except (TypeError, ValueError):
+                    continue
+                e = by.setdefault(lote, {'lote': lote, 'linha': None, 'trecho': None,
+                                         **{k: None for k in CAMPOS}})
+                for k in CAMPOS:
+                    if not e[k] and r.get(k): e[k] = str(r[k]).strip()
+                ln = r.get('linha')
+                if isinstance(ln, int) and (e['linha'] is None or ln < e['linha']):
+                    e['linha'] = ln; e['trecho'] = r.get('trecho')
+    except ClaudeIndisponivel as e:
+        print(f"ERRO: extracao abortada, {e}", file=sys.stderr)
+        sys.exit(2)
 
     for e in by.values():
         e['timestamp'] = ts.get(e['linha'], '') if e['linha'] else ''
